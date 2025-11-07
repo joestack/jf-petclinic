@@ -1,0 +1,100 @@
+name: "jf-petclinic-build"
+on: 
+  - push
+  - pull_request
+
+permissions:
+  # This is required for requesting the OIDC token
+  id-token: write
+  # This is required for actions/checkout
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+ 
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.JF_URL }}
+        with:
+          oidc-provider-name: joestack/jf-petclinic@github
+
+      - name: Run JFrog CLI
+        run: |
+          # Ping the server
+          jf rt ping
+ 
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          #cache: maven
+ 
+      - name: Source Code Scan
+        run: |
+          jf audit --gradle --sast --sca --secrets --sbom --format=table > audit-results
+
+      - name: Upload Audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results
+          path: audit-results
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+ 
+      - name: Gradle config
+        run: |
+          jf gradlec \
+            --repo-deploy=jf-petclinic-gradle-release-local \
+            --repo-resolve=jf-petclinic-gradle-release
+ 
+      - name: Gradke Build & Test
+        run: |
+          # Build steps here
+          # jf gradle clean build test
+          jf gradle clean build test artifactoryPublish
+
+      - name: Build Tag and push Docker Image
+        env:
+          IMAGE_NAME: joefrog.jfrog.io/jf-petclinic-docker/petclinic-image:${{ github.run_number }}
+        run: |
+          jf docker build -t $IMAGE_NAME .
+          jf docker push $IMAGE_NAME    
+
+      - name: Scan Docker Image
+        env:
+          IMAGE_NAME: joefrog.jfrog.io/jf-petclinic-docker/petclinic-image:${{ github.run_number }}
+        run: |
+          # Führe Xray Scan durch und speichere Ergebnisse als JSON
+          jf docker scan $IMAGE_NAME --format=json > xray-results.json
+      
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: xray-scan-results
+          path: xray-results.json
+
+      - name: Publish Build Info
+        # no longer necessary
+        # name and number are automatically set
+        # use env to override the defaults
+        ## [Error] Build petclinic-build is not selected for indexing
+        ## so back to env..
+        ### now I have enabled Admin->XraySettings->IndexedResources->builds->petclini-build
+        ### backout env once again
+        #env:
+        #  JFROG_CLI_BUILD_NAME: petclinic-build
+        #  JFROG_CLI_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          # Collect Build-Info
+          jf rt build-add-git # connect to git metadata and repo
+          #jf build-scan # Build Info: Security must be after build-publish
+          jf rt build-collect-env # show ENV variables
+          jf rt build-publish # push info to rt 
+          jf build-scan # Build Info: Security
