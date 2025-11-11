@@ -1,0 +1,38 @@
+name: "Frogbot Scan Pull Request"
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+  id-token: write
+
+jobs:
+  scan-pull-request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.JF_URL }}
+        with:
+          oidc-provider-name: joestack/jf-petclinic@github
+
+      - name: Run Frogbot
+        uses: jfrog/frogbot@v2
+        env:
+          JF_URL: ${{ vars.JF_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JF_GIT_PROVIDER: github
+          JF_GIT_OWNER: ${{ github.repository_owner }}
+          JF_GIT_REPO: ${{ github.event.repository.name }}
+          JF_GIT_PULL_REQUEST_ID: ${{ github.event.pull_request.number }}
+          JF_INCLUDE_ALL_VULNERABILITIES: "TRUE"
+          JF_WATCHES: "w-critical"
