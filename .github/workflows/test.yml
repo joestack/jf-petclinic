@@ -113,5 +113,5 @@ jobs:
         
       - name: Generate Job Summary
         run: |
-          jf csm
+          jf gsm
         continue-on-error: true
