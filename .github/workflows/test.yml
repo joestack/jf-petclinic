@@ -8,17 +8,19 @@ on:
 
 permissions:
   pull-requests: write
-  contents: read
+  contents: write # was read
   id-token: write
+  actions: read
+  security-events: write
 
 jobs:
-  scan-pull-request:
+  build-and-scan:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
+        #with:
+        #  ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4
@@ -27,9 +29,78 @@ jobs:
         with:
           oidc-provider-name: joestack/jf-petclinic@github
 
+      - name: Run JFrog CLI
+        run: |
+          # Ping the server
+          jf rt ping
+ 
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          #cache: maven
+ 
+      - name: Source Code Scan
+        run: |
+          jf audit --gradle --sast --sca --secrets --sbom --format=table > audit-results
+
+      - name: Upload Audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results
+          path: audit-results
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+ 
+      - name: Gradle config
+        run: |
+          jf gradlec \
+            --repo-deploy=jf-petclinic-gradle-release-local \
+            --repo-resolve=jf-petclinic-gradle-release
+ 
+      - name: Gradke Build & Test
+        run: |
+          # Build steps here
+          # jf gradle clean build test
+          jf gradle clean build test artifactoryPublish
+
+      - name: Build Tag and push Docker Image
+        env:
+          IMAGE_NAME: joefrog.jfrog.io/jf-petclinic-docker/petclinic-image:${{ github.run_number }}
+        run: |
+          jf docker build -t $IMAGE_NAME .
+          jf docker push $IMAGE_NAME    
+
+      - name: Scan Docker Image
+        env:
+          IMAGE_NAME: joefrog.jfrog.io/jf-petclinic-docker/petclinic-image:${{ github.run_number }}
+        run: |
+          # Führe Xray Scan durch und speichere Ergebnisse als JSON
+          jf docker scan $IMAGE_NAME --format=json > xray-results.json
+      
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: xray-scan-results
+          path: xray-results.json
+
+      - name: Publish Build Info
+        run: |
+          # Collect Build-Info
+          jf rt build-add-git # connect to git metadata and repo
+          jf rt build-collect-env # show ENV variables
+          jf rt build-publish # push info to rt 
+
+      - name: Scan Build with Xray
+        run: |
+          jf build-scan # Build Info: Security
+
       - name: Run Frogbot
         uses: jfrog/frogbot@v2
         env:
+          #JFROG_CLI_LOG_LEVEL: DEBUG
           JF_URL: ${{ vars.JF_URL }}
           JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
           JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -37,5 +108,10 @@ jobs:
           JF_GIT_OWNER: ${{ github.repository_owner }}
           JF_GIT_REPO: ${{ github.event.repository.name }}
           JF_GIT_PULL_REQUEST_ID: ${{ github.event.pull_request.number }}
-          JF_INCLUDE_ALL_VULNERABILITIES: "TRUE"
-          JF_WATCHES: "w-critical"
+          #JF_INCLUDE_ALL_VULNERABILITIES: "TRUE"
+          #JF_WATCHES: "w-critical"
+        
+      - name: Generate Job Summary
+        run: |
+          jf csm
+        continue-on-error: true
