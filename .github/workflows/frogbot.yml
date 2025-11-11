@@ -1,9 +1,13 @@
 name: "Frogbot Scan Repository"
 on:
+  pull_request_target: 
+    types: [opened, synchronize] # Triggers scan-pr flow for every opened/updated pull request
+  push: # Triggers scan-repo flow for every push to the specified branches
+    branches:
+      - main
   schedule:
-    # Täglich um 2 Uhr morgens scannen
-    - cron: "0 2 * * *"
-  workflow_dispatch:
+    - cron: "0 0 * * *"   # The repository will be scanned once a day at 00:00 GMT.
+  workflow_dispatch: # The repository will be scanned on demand
 
 permissions:
   contents: write
