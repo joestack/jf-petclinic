@@ -75,7 +75,7 @@ jobs:
       - name: Scan Build with Xray Watches
         id: xray-scan
         run: |
-          jf bs ${{ github.repository }} ${{ github.run_number }} \
+          jf bs \
              --watches="w-critical" \
              --fail=false \
              --format=json > scan-results.json
