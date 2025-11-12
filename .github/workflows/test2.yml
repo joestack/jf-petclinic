@@ -79,9 +79,41 @@ jobs:
              --fail=true \
              --format=json > scan-results.json
           
-          # # Scan-Status auswerten
-          # cat scan-results.json
+          # Scan-Status auswerten
+          cat scan-results.json
+
+          # Funktion zum sicheren Parsen
+          parse_scan_results() {
+          local json_file=$1
+
+          # Prüfen ob Datei existiert
+          if [ ! -f "$json_file" ]; then
+            echo "0"
+            return
+          fi
           
+          # Violations extrahieren (funktioniert für alle Formate)
+          jq -r '
+          if type == "array" then
+            [.[] | select(.violations) | .violations[] | select(.severity == "Critical")] | length
+            elif type == "object" then
+          if has("violations") then
+            [.violations[] | select(.severity == "Critical")] | length
+          else
+          0
+          end
+          else
+          0
+          end
+          ' "$json_file" 2>/dev/null || echo "0"
+          }
+
+          # Verwendung
+          CRITICAL=$(parse_scan_results scan-results.json)
+          echo "Kritische Violations: $CRITICAL"
+
+
+
           # # Bei kritischen Vulnerabilities fehlschlagen
           # CRITICAL_COUNT=$(jq '.summary.total_critical // 0' scan-results.json)
           # HIGH_COUNT=$(jq '.summary.total_high // 0' scan-results.json)
