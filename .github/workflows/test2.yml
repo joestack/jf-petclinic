@@ -1,4 +1,4 @@
-name: "jf-petclinic"
+name: "jf-petclinic-build"
 on:
   pull_request_target:
     types: [opened, synchronize]
