@@ -1,0 +1,37 @@
+name: "jf-petclinic-build"
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+  push: # Triggers scan-repo flow for every push to the specified branches
+    branches:
+      - main
+      - develop
+
+permissions:
+  pull-requests: write
+  contents: read
+  id-token: write
+  actions: read
+  security-events: write
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        #with:
+        #  ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.JF_URL }}
+        with:
+          oidc-provider-name: joestack/jf-petclinic@github
+
+      - name: Run JFrog CLI
+        run: |
+          # Ping the server
+          jf rt ping
+          jf c show
+          jq --version
