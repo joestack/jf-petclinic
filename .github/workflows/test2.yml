@@ -76,7 +76,7 @@ jobs:
         id: xray-scan
         run: |
           jf bs \
-             --watches="w-critical" \
+             --watches=w-critical \
              --fail=false \
              --format=json > scan-results.json
           
