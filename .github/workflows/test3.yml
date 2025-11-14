@@ -45,7 +45,8 @@ jobs:
  
       - name: Source Code Scan
         run: |
-          jf audit --gradle --sast --sca --secrets --sbom --format=table > audit-results
+          #jf audit --gradle --sast --sca --secrets --sbom --format=table > audit-results
+          jf audit --format=table > audit-results
 
       - name: Upload Audit results
         uses: actions/upload-artifact@v4
