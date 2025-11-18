@@ -22,7 +22,7 @@ jobs:
       matrix:
         branch: ["main"]
     steps:
-      - uses: jfrog/frogbot@v5
+      - uses: jfrog/frogbot@v2
         env:
           JF_URL: ${{ vars.JF_URL }}
           JF_GIT_TOKEN: ${{ secrets.JF_GIT_TOKEN }}
