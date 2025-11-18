@@ -5,16 +5,33 @@ on:
   push: # Triggers scan-repo flow for every push to the specified branches
     branches:
       - main
-      - develop
+  workflow_dispatch:
+    
 
 permissions:
   pull-requests: write
-  contents: read
+  contents: write
   id-token: write
   actions: read
   security-events: write
 
 jobs:
+  frogbot-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: ["main"]
+    steps:
+      - uses: jfrog/frogbot@v5
+        env:
+          JF_URL: ${{ var.JF_URL }}
+          JF_GIT_TOKEN: ${{ secrets.JF_GIT_TOKEN }}
+          JF_GIT_BASE_BRANCH: ${{ matrix.branch }}
+        with:
+          oidc-provider-name: joestack/jf-petclinic@github
+
+      
+
   build-and-scan:
     runs-on: ubuntu-latest
     steps:
@@ -46,7 +63,7 @@ jobs:
       - name: Source Code Scan
         run: |
           #jf audit --gradle --sast --sca --secrets --sbom --format=table > audit-results
-          jf audit --format=table > audit-results
+          jf audit --format=table > audit-results # --fail=true 
 
       - name: Upload Audit results
         uses: actions/upload-artifact@v4
